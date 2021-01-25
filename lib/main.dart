@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_analytics/observer.dart';
-import 'tabs_page.dart';
+import 'default/tabs_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +46,8 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   _MyHomePageState(this.analytics, this.observer);
 
+  int _count = 1;
+
   final FirebaseAnalyticsObserver observer;
   final FirebaseAnalytics analytics;
   String _message = '';
@@ -58,7 +60,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _sendAnalyticsEvent() async {
     await analytics.logEvent(
-      name: 'test_event',
+      name: 'get_loan',
       parameters: <String, dynamic>{
         'string': 'string',
         'int': 42,
@@ -76,9 +78,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _testSetCurrentScreen() async {
+    _count++;
+
     await analytics.setCurrentScreen(
-      screenName: 'Analytics Demo',
-      screenClassOverride: 'AnalyticsDemo',
+      screenName: 'screenName: Analytics Demo $_count',
+      screenClassOverride: 'screenClassOverride: AnalyticsDemo',
     );
     setMessage('setCurrentScreen succeeded');
   }
