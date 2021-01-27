@@ -1,264 +1,108 @@
 import 'dart:async';
-import 'package:firebase_core/firebase_core.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_analytics/observer.dart';
-import 'default/tabs_page.dart';
+import 'package:image_picker/image_picker.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+void main() {
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  static FirebaseAnalytics analytics = FirebaseAnalytics();
-  static FirebaseAnalyticsObserver observer = FirebaseAnalyticsObserver(analytics: analytics);
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Firebase Analytics Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      navigatorObservers: <NavigatorObserver>[observer],
-      home: MyHomePage(
-        title: 'Firebase Analytics Demo',
-        analytics: analytics,
-        observer: observer,
-      ),
+      title: 'Image Picker Demo',
+      home: MyHomePage(title: 'Image Picker Example'),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title, this.analytics, this.observer}) : super(key: key);
+  MyHomePage({Key key, this.title}) : super(key: key);
 
   final String title;
-  final FirebaseAnalytics analytics;
-  final FirebaseAnalyticsObserver observer;
 
   @override
-  _MyHomePageState createState() => _MyHomePageState(analytics, observer);
+  _MyHomePageState createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  _MyHomePageState(this.analytics, this.observer);
+  PickedFile _imageFile;
+  dynamic _pickImageError;
+  String _retrieveDataError;
 
-  int _count = 1;
+  final ImagePicker _picker = ImagePicker();
+  final TextEditingController maxWidthController = TextEditingController();
+  final TextEditingController maxHeightController = TextEditingController();
+  final TextEditingController qualityController = TextEditingController();
 
-  final FirebaseAnalyticsObserver observer;
-  final FirebaseAnalytics analytics;
-  String _message = '';
-
-  void setMessage(String message) {
-    setState(() {
-      _message = message;
+  void _onImageButtonPressed(ImageSource source, {BuildContext context}) async {
+    await _displayPickImageDialog(context, (double maxWidth, double maxHeight, int quality) async {
+      try {
+        final pickedFile = await _picker.getImage(
+          source: source,
+          maxWidth: maxWidth,
+          maxHeight: maxHeight,
+          imageQuality: quality,
+        );
+        setState(() {
+          _imageFile = pickedFile;
+        });
+      } catch (e) {
+        setState(() {
+          _pickImageError = e;
+        });
+      }
     });
   }
 
-  Future<void> _sendAnalyticsEvent() async {
-    await analytics.logEvent(
-      name: 'get_loan',
-      parameters: <String, dynamic>{
-        'string': 'string',
-        'int': 42,
-        'long': 12345678910,
-        'double': 42.0,
-        'bool': true,
-      },
-    );
-    setMessage('logEvent succeeded');
+  @override
+  void dispose() {
+    maxWidthController.dispose();
+    maxHeightController.dispose();
+    qualityController.dispose();
+    super.dispose();
   }
 
-  Future<void> _testSetUserId() async {
-    await analytics.setUserId('some-user');
-    setMessage('setUserId succeeded');
+  Widget _previewImage() {
+    final Text retrieveError = _getRetrieveErrorWidget();
+    if (retrieveError != null) {
+      return retrieveError;
+    }
+    if (_imageFile != null) {
+      if (kIsWeb) {
+        // Why network?
+        // See https://pub.dev/packages/image_picker#getting-ready-for-the-web-platform
+        return Image.network(_imageFile.path);
+      } else {
+        return Semantics(child: Image.file(File(_imageFile.path)), label: 'image_picker_example_picked_image');
+      }
+    } else if (_pickImageError != null) {
+      return Text(
+        'Pick image error: $_pickImageError',
+        textAlign: TextAlign.center,
+      );
+    } else {
+      return const Text(
+        'You have not yet picked an image.',
+        textAlign: TextAlign.center,
+      );
+    }
   }
 
-  Future<void> _testSetCurrentScreen() async {
-    _count++;
-
-    await analytics.setCurrentScreen(
-      screenName: 'screenName: Analytics Demo $_count',
-      screenClassOverride: 'screenClassOverride: AnalyticsDemo',
-    );
-    setMessage('setCurrentScreen succeeded');
-  }
-
-  Future<void> _testSetAnalyticsCollectionEnabled() async {
-    await analytics.setAnalyticsCollectionEnabled(false);
-    await analytics.setAnalyticsCollectionEnabled(true);
-    setMessage('setAnalyticsCollectionEnabled succeeded');
-  }
-
-  Future<void> _testSetSessionTimeoutDuration() async {
-    await analytics.android?.setSessionTimeoutDuration(2000000);
-    setMessage('setSessionTimeoutDuration succeeded');
-  }
-
-  Future<void> _testSetUserProperty() async {
-    await analytics.setUserProperty(name: 'regular', value: 'indeed');
-    setMessage('setUserProperty succeeded');
-  }
-
-  Future<void> _testAllEventTypes() async {
-    await analytics.logAddPaymentInfo();
-    await analytics.logAddToCart(
-      currency: 'USD',
-      value: 123.0,
-      itemId: 'test item id',
-      itemName: 'test item name',
-      itemCategory: 'test item category',
-      quantity: 5,
-      price: 24.0,
-      origin: 'test origin',
-      itemLocationId: 'test location id',
-      destination: 'test destination',
-      startDate: '2015-09-14',
-      endDate: '2015-09-17',
-    );
-    await analytics.logAddToWishlist(
-      itemId: 'test item id',
-      itemName: 'test item name',
-      itemCategory: 'test item category',
-      quantity: 5,
-      price: 24.0,
-      value: 123.0,
-      currency: 'USD',
-      itemLocationId: 'test location id',
-    );
-    await analytics.logAppOpen();
-    await analytics.logBeginCheckout(
-      value: 123.0,
-      currency: 'USD',
-      transactionId: 'test tx id',
-      numberOfNights: 2,
-      numberOfRooms: 3,
-      numberOfPassengers: 4,
-      origin: 'test origin',
-      destination: 'test destination',
-      startDate: '2015-09-14',
-      endDate: '2015-09-17',
-      travelClass: 'test travel class',
-    );
-    await analytics.logCampaignDetails(
-      source: 'test source',
-      medium: 'test medium',
-      campaign: 'test campaign',
-      term: 'test term',
-      content: 'test content',
-      aclid: 'test aclid',
-      cp1: 'test cp1',
-    );
-    await analytics.logEarnVirtualCurrency(
-      virtualCurrencyName: 'bitcoin',
-      value: 345.66,
-    );
-    await analytics.logEcommercePurchase(
-      currency: 'USD',
-      value: 432.45,
-      transactionId: 'test tx id',
-      tax: 3.45,
-      shipping: 5.67,
-      coupon: 'test coupon',
-      location: 'test location',
-      numberOfNights: 3,
-      numberOfRooms: 4,
-      numberOfPassengers: 5,
-      origin: 'test origin',
-      destination: 'test destination',
-      startDate: '2015-09-13',
-      endDate: '2015-09-14',
-      travelClass: 'test travel class',
-    );
-    await analytics.logGenerateLead(
-      currency: 'USD',
-      value: 123.45,
-    );
-    await analytics.logJoinGroup(
-      groupId: 'test group id',
-    );
-    await analytics.logLevelUp(
-      level: 5,
-      character: 'witch doctor',
-    );
-    await analytics.logLogin();
-    await analytics.logPostScore(
-      score: 1000000,
-      level: 70,
-      character: 'tiefling cleric',
-    );
-    await analytics.logPresentOffer(
-      itemId: 'test item id',
-      itemName: 'test item name',
-      itemCategory: 'test item category',
-      quantity: 6,
-      price: 3.45,
-      value: 67.8,
-      currency: 'USD',
-      itemLocationId: 'test item location id',
-    );
-    await analytics.logPurchaseRefund(
-      currency: 'USD',
-      value: 45.67,
-      transactionId: 'test tx id',
-    );
-    await analytics.logSearch(
-      searchTerm: 'hotel',
-      numberOfNights: 2,
-      numberOfRooms: 1,
-      numberOfPassengers: 3,
-      origin: 'test origin',
-      destination: 'test destination',
-      startDate: '2015-09-14',
-      endDate: '2015-09-16',
-      travelClass: 'test travel class',
-    );
-    await analytics.logSelectContent(
-      contentType: 'test content type',
-      itemId: 'test item id',
-    );
-    await analytics.logShare(contentType: 'test content type', itemId: 'test item id', method: 'facebook');
-    await analytics.logSignUp(
-      signUpMethod: 'test sign up method',
-    );
-    await analytics.logSpendVirtualCurrency(
-      itemName: 'test item name',
-      virtualCurrencyName: 'bitcoin',
-      value: 34,
-    );
-    await analytics.logTutorialBegin();
-    await analytics.logTutorialComplete();
-    await analytics.logUnlockAchievement(id: 'all Firebase API covered');
-    await analytics.logViewItem(
-      itemId: 'test item id',
-      itemName: 'test item name',
-      itemCategory: 'test item category',
-      itemLocationId: 'test item location id',
-      price: 3.45,
-      quantity: 6,
-      currency: 'USD',
-      value: 67.8,
-      flightNumber: 'test flight number',
-      numberOfPassengers: 3,
-      numberOfRooms: 1,
-      numberOfNights: 2,
-      origin: 'test origin',
-      destination: 'test destination',
-      startDate: '2015-09-14',
-      endDate: '2015-09-15',
-      searchTerm: 'test search term',
-      travelClass: 'test travel class',
-    );
-    await analytics.logViewItemList(
-      itemCategory: 'test item category',
-    );
-    await analytics.logViewSearchResults(
-      searchTerm: 'test search term',
-    );
-    setMessage('All standard events logged successfully');
+  Future<void> retrieveLostData() async {
+    final LostData response = await _picker.getLostData();
+    if (response.isEmpty) {
+      return;
+    }
+    if (response.file != null) {
+      setState(() {
+        _imageFile = response.file;
+      });
+    } else {
+      _retrieveDataError = response.exception.code;
+    }
   }
 
   @override
@@ -267,48 +111,145 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Column(
+      body: Center(
+        child: !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+            ? FutureBuilder<void>(
+                future: retrieveLostData(),
+                builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
+                  switch (snapshot.connectionState) {
+                    case ConnectionState.none:
+                    case ConnectionState.waiting:
+                      return const Text(
+                        'You have not yet picked an image.',
+                        textAlign: TextAlign.center,
+                      );
+                    case ConnectionState.done:
+                      return _previewImage();
+                    default:
+                      if (snapshot.hasError) {
+                        return Text(
+                          'Pick image/video error: ${snapshot.error}}',
+                          textAlign: TextAlign.center,
+                        );
+                      } else {
+                        return const Text(
+                          'You have not yet picked an image.',
+                          textAlign: TextAlign.center,
+                        );
+                      }
+                  }
+                },
+              )
+            : _previewImage(),
+      ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: <Widget>[
-          MaterialButton(
-            child: const Text('Test logEvent'),
-            onPressed: _sendAnalyticsEvent,
+          Semantics(
+            label: 'image_picker_example_from_gallery',
+            child: FloatingActionButton(
+              onPressed: () {
+                _onImageButtonPressed(ImageSource.gallery, context: context);
+              },
+              heroTag: 'image0',
+              tooltip: 'Pick Image from gallery',
+              child: const Icon(Icons.photo_library),
+            ),
           ),
-          MaterialButton(
-            child: const Text('Test standard event types'),
-            onPressed: _testAllEventTypes,
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: FloatingActionButton(
+              onPressed: () {
+                _onImageButtonPressed(ImageSource.camera, context: context);
+              },
+              heroTag: 'image1',
+              tooltip: 'Take a Photo',
+              child: const Icon(Icons.camera_alt),
+            ),
           ),
-          MaterialButton(
-            child: const Text('Test setUserId'),
-            onPressed: _testSetUserId,
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: FloatingActionButton(
+              backgroundColor: Colors.red,
+              onPressed: () {
+                _onImageButtonPressed(ImageSource.gallery);
+              },
+              heroTag: 'video0',
+              tooltip: 'Pick Video from gallery',
+              child: const Icon(Icons.video_library),
+            ),
           ),
-          MaterialButton(
-            child: const Text('Test setCurrentScreen'),
-            onPressed: _testSetCurrentScreen,
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: FloatingActionButton(
+              backgroundColor: Colors.red,
+              onPressed: () {
+                _onImageButtonPressed(ImageSource.camera);
+              },
+              heroTag: 'video1',
+              tooltip: 'Take a Video',
+              child: const Icon(Icons.videocam),
+            ),
           ),
-          MaterialButton(
-            child: const Text('Test setAnalyticsCollectionEnabled'),
-            onPressed: _testSetAnalyticsCollectionEnabled,
-          ),
-          MaterialButton(
-            child: const Text('Test setSessionTimeoutDuration'),
-            onPressed: _testSetSessionTimeoutDuration,
-          ),
-          MaterialButton(
-            child: const Text('Test setUserProperty'),
-            onPressed: _testSetUserProperty,
-          ),
-          Text(_message, style: const TextStyle(color: Color.fromARGB(255, 0, 155, 0))),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-          child: const Icon(Icons.tab),
-          onPressed: () {
-            Navigator.of(context).push(MaterialPageRoute<TabsPage>(
-                settings: const RouteSettings(name: TabsPage.routeName),
-                builder: (BuildContext context) {
-                  return TabsPage(observer);
-                }));
-          }),
     );
   }
+
+  Text _getRetrieveErrorWidget() {
+    if (_retrieveDataError != null) {
+      final Text result = Text(_retrieveDataError);
+      _retrieveDataError = null;
+      return result;
+    }
+    return null;
+  }
+
+  Future<void> _displayPickImageDialog(BuildContext context, OnPickImageCallback onPick) async {
+    return showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text('Add optional parameters'),
+            content: Column(
+              children: <Widget>[
+                TextField(
+                  controller: maxWidthController,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(hintText: "Enter maxWidth if desired"),
+                ),
+                TextField(
+                  controller: maxHeightController,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(hintText: "Enter maxHeight if desired"),
+                ),
+                TextField(
+                  controller: qualityController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(hintText: "Enter quality if desired"),
+                ),
+              ],
+            ),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('CANCEL'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+              TextButton(
+                  child: const Text('PICK'),
+                  onPressed: () {
+                    double width = maxWidthController.text.isNotEmpty ? double.parse(maxWidthController.text) : null;
+                    double height = maxHeightController.text.isNotEmpty ? double.parse(maxHeightController.text) : null;
+                    int quality = qualityController.text.isNotEmpty ? int.parse(qualityController.text) : null;
+                    onPick(width, height, quality);
+                    Navigator.of(context).pop();
+                  }),
+            ],
+          );
+        });
+  }
 }
+
+typedef void OnPickImageCallback(double maxWidth, double maxHeight, int quality);
