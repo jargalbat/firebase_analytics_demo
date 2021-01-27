@@ -25,8 +25,20 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.0
+
+  # Google analytics
+  #  firebase_core: ^0.7.0
+
+  #  firebase_ml_custom: ^0.1.0
+  #  firebase_ml_custom: ^0.0.5
+  #  firebase_messaging: ^6.0.12
+  #  firebase_crashlytics: ^0.2.4
+
+  firebase_core: ^0.5.3
   firebase_analytics: ^6.3.0
-#  firebase_ml_custom: ^0.1.0
+  firebase_ml_custom: ^0.0.5
+
+  # Utils
   image_picker: ^0.6.7+21
 
 dev_dependencies:
